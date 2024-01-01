@@ -1,6 +1,56 @@
 CHANGELOG
 =========
 
+0.45.0
+------
+- Added `transform` action to conditionally perform a series of actions
+  ```sh
+  # Disallow selecting an empty line
+  echo -e "1. Hello\n2. Goodbye\n\n3. Exit" |
+    fzf --height '~100%' --reverse --header 'Select one' \
+        --bind 'enter:transform:[[ -n {} ]] && echo accept || echo "change-header:Invalid selection"'
+
+  # Move cursor past the empty line
+  echo -e "1. Hello\n2. Goodbye\n\n3. Exit" |
+    fzf --height '~100%' --reverse --header 'Select one' \
+        --bind 'enter:transform:[[ -n {} ]] && echo accept || echo "change-header:Invalid selection"' \
+        --bind 'focus:transform:[[ -n {} ]] && exit; [[ {fzf:action} =~ up$ ]] && echo up || echo down'
+
+  # A single key binding to toggle between modes
+  fd --type file |
+    fzf --prompt 'Files> ' \
+        --header 'CTRL-T: Switch between Files/Directories' \
+        --bind 'ctrl-t:transform:[[ ! {fzf:prompt} =~ Files ]] &&
+                  echo "change-prompt(Files> )+reload(fd --type file)" ||
+                  echo "change-prompt(Directories> )+reload(fd --type directory)"'
+  ```
+- Added placeholder expressions
+    - `{fzf:action}` - The name of the last action performed
+    - `{fzf:prompt}` - Prompt string (including ANSI color codes)
+    - `{fzf:query}` - Synonym for `{q}`
+- Added support for negative height
+  ```sh
+  # Terminal height minus 1, so you can still see the command line
+  fzf --height=-1
+  ```
+  - This handles a terminal resize better than `--height=$(($(tput lines) - 1))`
+- Added `accept-or-print-query` action that acts like `accept` but prints the
+  current query when there's no match for the query
+  ```sh
+  # You can make CTRL-R paste the current query when there's no match
+  export FZF_CTRL_R_OPTS='--bind enter:accept-or-print-query'
+  ```
+  - Note that there are alternative ways to implement the same strategy
+    ```sh
+    # 'become' is apparently more versatile but it's not available on Windows.
+    export FZF_CTRL_R_OPTS='--bind "enter:become:if [ -z {} ]; then echo {q}; else echo {}; fi"'
+
+    # Using the new 'transform' action
+    export FZF_CTRL_R_OPTS='--bind "enter:transform:[ -z {} ] && echo print-query || echo accept"'
+    ```
+- Added `show-header` and `hide-header` actions
+- Bug fixes
+
 0.44.1
 ------
 - Fixed crash when preview window is hidden on `focus` event
