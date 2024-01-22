@@ -17,8 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mattn/go-runewidth"
-	"github.com/rivo/uniseg"
+	"github.com/junegunn/uniseg"
 
 	"github.com/junegunn/fzf/src/tui"
 	"github.com/junegunn/fzf/src/util"
@@ -251,7 +250,10 @@ type Terminal struct {
 	borderWidth        int
 	count              int
 	progress           int
+	hasResultActions   bool
+	hasFocusActions    bool
 	hasLoadActions     bool
+	hasResizeActions   bool
 	triggerLoad        bool
 	reading            bool
 	running            bool
@@ -289,6 +291,8 @@ type Terminal struct {
 	termSize           tui.TermSize
 	lastAction         actionType
 	lastFocus          int32
+	areaLines          int
+	areaColumns        int
 }
 
 type selectedItem struct {
@@ -449,6 +453,17 @@ const (
 	actHideHeader
 )
 
+func (a actionType) Name() string {
+	name := ""
+	for i, r := range a.String()[3:] {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			name += "-"
+		}
+		name += string(r)
+	}
+	return strings.ToLower(name)
+}
+
 func processExecution(action actionType) bool {
 	switch action {
 	case actTransform,
@@ -519,7 +534,6 @@ func defaultKeymap() map[tui.Event][]*action {
 	}
 
 	add(tui.Invalid, actInvalid)
-	add(tui.Resize, actClearScreen)
 	add(tui.CtrlA, actBeginningOfLine)
 	add(tui.CtrlB, actBackwardChar)
 	add(tui.CtrlC, actAbort)
@@ -730,6 +744,8 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		ellipsis:           opts.Ellipsis,
 		ansi:               opts.Ansi,
 		tabstop:            opts.Tabstop,
+		hasResultActions:   false,
+		hasFocusActions:    false,
 		hasLoadActions:     false,
 		triggerLoad:        false,
 		reading:            true,
@@ -757,7 +773,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		killChan:           make(chan int),
 		serverInputChan:    make(chan []*action, 10),
 		serverOutputChan:   make(chan string),
-		eventChan:          make(chan tui.Event, 3), // load / zero|one | GetChar
+		eventChan:          make(chan tui.Event, 6), // (load + result + zero|one) | (focus) | (resize) | (GetChar)
 		tui:                renderer,
 		initFunc:           func() { renderer.Init() },
 		executing:          util.NewAtomicBool(false),
@@ -781,7 +797,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		t.separator, t.separatorLen = t.ansiLabelPrinter(bar, &tui.ColSeparator, true)
 	}
 	if t.unicode {
-		t.borderWidth = runewidth.RuneWidth('│')
+		t.borderWidth = uniseg.StringWidth("│")
 	}
 	if opts.Scrollbar == nil {
 		if t.unicode && t.borderWidth == 1 {
@@ -801,6 +817,9 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		}
 	}
 
+	_, t.hasResizeActions = t.keymap[tui.Resize.AsEvent()]
+	_, t.hasResultActions = t.keymap[tui.Result.AsEvent()]
+	_, t.hasFocusActions = t.keymap[tui.Focus.AsEvent()]
 	_, t.hasLoadActions = t.keymap[tui.Load.AsEvent()]
 
 	if t.listenAddr != nil {
@@ -819,6 +838,14 @@ func (t *Terminal) environ() []string {
 	if t.listenPort != nil {
 		env = append(env, fmt.Sprintf("FZF_PORT=%d", *t.listenPort))
 	}
+	env = append(env, "FZF_QUERY="+string(t.input))
+	env = append(env, "FZF_ACTION="+t.lastAction.Name())
+	env = append(env, "FZF_PROMPT="+string(t.promptString))
+	env = append(env, fmt.Sprintf("FZF_TOTAL_COUNT=%d", t.count))
+	env = append(env, fmt.Sprintf("FZF_MATCH_COUNT=%d", t.merger.Length()))
+	env = append(env, fmt.Sprintf("FZF_SELECT_COUNT=%d", len(t.selected)))
+	env = append(env, fmt.Sprintf("FZF_LINES=%d", t.areaLines))
+	env = append(env, fmt.Sprintf("FZF_COLUMNS=%d", t.areaColumns))
 	return env
 }
 
@@ -1073,6 +1100,9 @@ func (t *Terminal) UpdateList(merger *Merger) {
 				t.eventChan <- one
 			}
 		}
+		if t.hasResultActions {
+			t.eventChan <- tui.Result.AsEvent()
+		}
 	}
 	t.mutex.Unlock()
 	t.reqBox.Set(reqInfo, nil)
@@ -1281,6 +1311,9 @@ func (t *Terminal) resizeWindows(forcePreview bool) {
 	}
 	width -= paddingInt[1] + paddingInt[3]
 	height -= paddingInt[0] + paddingInt[2]
+
+	t.areaLines = height
+	t.areaColumns = width
 
 	// Set up preview window
 	noBorder := tui.MakeBorderStyle(tui.BorderNone, t.unicode)
@@ -2534,14 +2567,7 @@ func replacePlaceholder(params replacePlaceholderParams) string {
 				}
 			}
 		case match == "{fzf:action}":
-			name := ""
-			for i, r := range params.lastAction.String()[3:] {
-				if i > 0 && r >= 'A' && r <= 'Z' {
-					name += "-"
-				}
-				name += string(r)
-			}
-			return strings.ToLower(name)
+			return params.lastAction.Name()
 		case match == "{fzf:prompt}":
 			return quoteEntry(params.prompt)
 		default:
@@ -3070,9 +3096,9 @@ func (t *Terminal) Loop() {
 							t.track = trackDisabled
 							t.printInfo()
 						}
-						if onFocus, prs := t.keymap[tui.Focus.AsEvent()]; prs && focusChanged && currentIndex != t.lastFocus {
-							t.lastFocus = focusedIndex
-							t.serverInputChan <- onFocus
+						if t.hasFocusActions && focusChanged && currentIndex != t.lastFocus {
+							t.lastFocus = currentIndex
+							t.eventChan <- tui.Focus.AsEvent()
 						}
 						if focusChanged || version != t.version {
 							version = t.version
@@ -3103,6 +3129,9 @@ func (t *Terminal) Loop() {
 						t.redraw()
 						if wasHidden && t.hasPreviewWindow() {
 							refreshPreview(t.previewOpts.command)
+						}
+						if req == reqResize && t.hasResizeActions {
+							t.eventChan <- tui.Resize.AsEvent()
 						}
 					case reqClose:
 						exit(func() int {
@@ -3186,7 +3215,7 @@ func (t *Terminal) Loop() {
 			}
 			select {
 			case event = <-t.eventChan:
-				needBarrier = !event.Is(tui.Load, tui.One, tui.Zero)
+				needBarrier = !event.Is(tui.Load, tui.Result, tui.Focus, tui.One, tui.Zero, tui.Resize)
 			case serverActions := <-t.serverInputChan:
 				event = tui.Invalid.AsEvent()
 				if t.listenAddr == nil || t.listenAddr.IsLocal() || t.listenUnsafe {
