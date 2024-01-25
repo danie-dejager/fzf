@@ -1,14 +1,14 @@
-Name: fzf
-Version: 0.46.0
-Release: 1%{?dist}
-Summary: A command-line fuzzy finder
-License: MIT license
-URL: https://github.com/junegunn/fzf
-https://github.com/junegunn/fzf/archive/refs/tags/%{version}.tar.gz
+Name:		fzf
+Version:	0.46.0
+Release:	1%{?dist}
+Summary:	A command-line fuzzy finder
+License:	MIT license
+URL:		https://github.com/junegunn/fzf
+Source0:	https://github.com/junegunn/fzf/archive/refs/tags/%{version}.tar.gz
 
-BuildRequires:  golang
-BuildRequires:  git
-BuildRequires:  systemd-rpm-macros
+BuildRequires:	golang
+BuildRequires:	git
+BuildRequires:	systemd-rpm-macros
 
 %global _hardened_build 1
 %global debug_package %{nil}
