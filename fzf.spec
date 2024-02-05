@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.46.0
+Version:	0.46.1
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -46,6 +46,9 @@ install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
 %{_datadir}/fzf/shell/key-bindings.bash
 
 %changelog
+* Mon Feb 5 2024 Danie de Jager - 0.46.1-1
+- Bug fixes and improvements
+- Updated rivo/uniseg dependency to v0.4.6
 * Thu Jan 25 2024 Danie de Jager - 0.46.0-1
 * Wed Nov 22 2023 Danie de Jager - 0.44.1-2
 - fix: version info was previously not correct
