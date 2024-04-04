@@ -1,6 +1,51 @@
 CHANGELOG
 =========
 
+0.49.0
+------
+- Ingestion performance improved by around 40% (more or less depending on options)
+- `--info=hidden` and `--info=inline-right` will no longer hide the horizontal separator by default. This gives you more flexibility in customizing the layout.
+    ```sh
+    fzf --border --info=inline-right
+    fzf --border --info=inline-right --separator ═
+    fzf --border --info=inline-right --no-separator
+    fzf --border --info=hidden
+    fzf --border --info=hidden --separator ━
+    fzf --border --info=hidden --no-separator
+    ```
+- Added two environment variables exported to the child processes
+    - `FZF_PREVIEW_LABEL`
+    - `FZF_BORDER_LABEL`
+    ```sh
+    # Use the current value of $FZF_PREVIEW_LABEL to determine which actions to perform
+    git ls-files |
+      fzf --header 'Press CTRL-P to change preview mode' \
+          --bind='ctrl-p:transform:[[ $FZF_PREVIEW_LABEL =~ cat ]] \
+          && echo "change-preview(git log --color=always \{})+change-preview-label([[ log ]])" \
+          || echo "change-preview(bat --color=always \{})+change-preview-label([[ cat ]])"'
+    ```
+- Renamed `track` action to `track-current` to highlight the difference between the global tracking state set by `--track` and a one-off tracking action
+    - `track` is still available as an alias
+- Added `untrack-current` and `toggle-track-current` actions
+    - `*-current` actions are no-op when the global tracking state is set
+- Bug fixes and minor improvements
+
+0.48.1
+------
+- CTRL-T and ALT-C bindings can be disabled by setting `FZF_CTRL_T_COMMAND` and `FZF_ALT_C_COMMAND` to empty strings respectively when sourcing the script
+    ```sh
+    # bash
+    FZF_CTRL_T_COMMAND= FZF_ALT_C_COMMAND= eval "$(fzf --bash)"
+
+    # zsh
+    FZF_CTRL_T_COMMAND= FZF_ALT_C_COMMAND= eval "$(fzf --zsh)"
+
+    # fish
+    fzf --fish | FZF_CTRL_T_COMMAND= FZF_ALT_C_COMMAND= source
+    ```
+    - Setting the variables after sourcing the script will have no effect
+- Bug fixes
+
 0.48.0
 ------
 - Shell integration scripts are now embedded in the fzf binary. This simplifies the distribution, and the users are less likely to have problems caused by using incompatible scripts and binaries.

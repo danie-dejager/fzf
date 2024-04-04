@@ -62,10 +62,12 @@ fzf-file-widget() {
   zle reset-prompt
   return $ret
 }
-zle     -N            fzf-file-widget
-bindkey -M emacs '^T' fzf-file-widget
-bindkey -M vicmd '^T' fzf-file-widget
-bindkey -M viins '^T' fzf-file-widget
+if [[ "${FZF_CTRL_T_COMMAND-x}" != "" ]]; then
+  zle     -N            fzf-file-widget
+  bindkey -M emacs '^T' fzf-file-widget
+  bindkey -M vicmd '^T' fzf-file-widget
+  bindkey -M viins '^T' fzf-file-widget
+fi
 
 # ALT-C - cd into the selected directory
 fzf-cd-widget() {
@@ -76,17 +78,19 @@ fzf-cd-widget() {
     return 0
   fi
   zle push-line # Clear buffer. Auto-restored on next prompt.
-  BUFFER="builtin cd -- ${(q)dir}"
+  BUFFER="builtin cd -- ${(q)dir:a}"
   zle accept-line
   local ret=$?
   unset dir # ensure this doesn't end up appearing in prompt expansion
   zle reset-prompt
   return $ret
 }
-zle     -N             fzf-cd-widget
-bindkey -M emacs '\ec' fzf-cd-widget
-bindkey -M vicmd '\ec' fzf-cd-widget
-bindkey -M viins '\ec' fzf-cd-widget
+if [[ "${FZF_ALT_C_COMMAND-x}" != "" ]]; then
+  zle     -N             fzf-cd-widget
+  bindkey -M emacs '\ec' fzf-cd-widget
+  bindkey -M vicmd '\ec' fzf-cd-widget
+  bindkey -M viins '\ec' fzf-cd-widget
+fi
 
 # CTRL-R - Paste the selected command from history into the command line
 fzf-history-widget() {
