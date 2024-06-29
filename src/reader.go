@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,7 +111,7 @@ func (r *Reader) readChannel(inputChan chan string) bool {
 }
 
 // ReadSource reads data from the default command or from standard input
-func (r *Reader) ReadSource(inputChan chan string, root string, opts walkerOpts, ignores []string) {
+func (r *Reader) ReadSource(inputChan chan string, root string, opts walkerOpts, ignores []string, sep byte) {
 	r.startEventPoller()
 	var success bool
 	if inputChan != nil {
@@ -118,7 +119,7 @@ func (r *Reader) ReadSource(inputChan chan string, root string, opts walkerOpts,
 	} else if util.IsTty(os.Stdin) {
 		cmd := os.Getenv("FZF_DEFAULT_COMMAND")
 		if len(cmd) == 0 {
-			success = r.readFiles(root, opts, ignores)
+			success = r.readFiles(root, opts, ignores, sep)
 		} else {
 			// We can't export FZF_* environment variables to the default command
 			success = r.readFromCommand(cmd, nil)
@@ -222,9 +223,20 @@ func (r *Reader) readFromStdin() bool {
 	return true
 }
 
-func (r *Reader) readFiles(root string, opts walkerOpts, ignores []string) bool {
+func isSymlinkToDir(path string, de os.DirEntry) bool {
+	if de.Type()&fs.ModeSymlink == 0 {
+		return false
+	}
+	if s, err := os.Stat(path); err == nil {
+		return s.IsDir()
+	}
+	return false
+}
+
+func (r *Reader) readFiles(root string, opts walkerOpts, ignores []string, sep byte) bool {
 	r.killed = false
 	conf := fastwalk.Config{Follow: opts.follow}
+	replaceSep := sep != os.PathSeparator
 	fn := func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -232,7 +244,7 @@ func (r *Reader) readFiles(root string, opts walkerOpts, ignores []string) bool 
 		path = filepath.Clean(path)
 		if path != "." {
 			isDir := de.IsDir()
-			if isDir {
+			if isDir || opts.follow && isSymlinkToDir(path, de) {
 				base := filepath.Base(path)
 				if !opts.hidden && base[0] == '.' {
 					return filepath.SkipDir
@@ -243,7 +255,15 @@ func (r *Reader) readFiles(root string, opts walkerOpts, ignores []string) bool 
 					}
 				}
 			}
-			if ((opts.file && !isDir) || (opts.dir && isDir)) && r.pusher([]byte(path)) {
+			bytes := stringBytes(path)
+			if replaceSep {
+				for i, b := range bytes {
+					if b == os.PathSeparator {
+						bytes[i] = sep
+					}
+				}
+			}
+			if ((opts.file && !isDir) || (opts.dir && isDir)) && r.pusher(bytes) {
 				atomic.StoreInt32(&r.event, int32(EvtReadNew))
 			}
 		}

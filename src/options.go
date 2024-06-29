@@ -53,6 +53,8 @@ Usage: fzf [options]
     --no-mouse              Disable mouse
     --bind=KEYBINDS         Custom key bindings. Refer to the man page.
     --cycle                 Enable cyclic scroll
+    --wrap                  Enable line wrap
+    --wrap-sign=STR         Indicator for wrapped lines
     --no-multi-line         Disable multi-line display of items when using --read0
     --keep-right            Keep the right end of the line visible on overflow
     --scroll-off=LINES      Number of screen lines to keep above or below when
@@ -88,6 +90,7 @@ Usage: fzf [options]
     --padding=PADDING       Padding inside border (TRBL | TB,RL | T,RL,B | T,R,B,L)
     --info=STYLE            Finder info style
                             [default|right|hidden|inline[-right][:PREFIX]]
+    --info-command=COMMAND  Command to generate info line
     --separator=STR         String to form horizontal separator on info line
     --no-separator          Hide info line separator
     --scrollbar[=C1[C2]]    Scrollbar character(s) (each for main and preview window)
@@ -144,6 +147,7 @@ Usage: fzf [options]
     --walker-root=DIR       Root directory from which to start walker (default: .)
     --walker-skip=DIRS      Comma-separated list of directory names to skip
                             (default: .git,node_modules)
+    --walker-path-sep=CHAR  Path separator to use (default: / on Unix, \ on Windows)
 
   Shell integration
     --bash                  Print script to set up Bash shell integration
@@ -434,6 +438,8 @@ type Options struct {
 	MinHeight    int
 	Layout       layoutType
 	Cycle        bool
+	Wrap         bool
+	WrapSign     *string
 	MultiLine    bool
 	CursorLine   bool
 	KeepRight    bool
@@ -443,12 +449,13 @@ type Options struct {
 	FileWord     bool
 	InfoStyle    infoStyle
 	InfoPrefix   string
+	InfoCommand  string
 	Separator    *string
 	JumpLabels   string
 	Prompt       string
 	Pointer      *string
 	Marker       *string
-	MarkerMulti  [3]string
+	MarkerMulti  *[3]string
 	Query        string
 	Select1      bool
 	Exit0        bool
@@ -483,6 +490,7 @@ type Options struct {
 	WalkerOpts   walkerOpts
 	WalkerRoot   string
 	WalkerSkip   []string
+	WalkerSep    byte
 	Version      bool
 	Help         bool
 	CPUProfile   string
@@ -541,6 +549,7 @@ func defaultOptions() *Options {
 		MinHeight:    10,
 		Layout:       layoutDefault,
 		Cycle:        false,
+		Wrap:         false,
 		MultiLine:    true,
 		KeepRight:    false,
 		Hscroll:      true,
@@ -553,6 +562,7 @@ func defaultOptions() *Options {
 		Prompt:       "> ",
 		Pointer:      nil,
 		Marker:       nil,
+		MarkerMulti:  nil,
 		Query:        "",
 		Select1:      false,
 		Exit0:        false,
@@ -584,6 +594,7 @@ func defaultOptions() *Options {
 		WalkerOpts:   walkerOpts{file: true, hidden: true, follow: true},
 		WalkerRoot:   ".",
 		WalkerSkip:   []string{".git", "node_modules"},
+		WalkerSep:    os.PathSeparator,
 		Help:         false,
 		Version:      false}
 }
@@ -1363,6 +1374,8 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actToggleTrackCurrent)
 		case "toggle-header":
 			appendAction(actToggleHeader)
+		case "toggle-wrap":
+			appendAction(actToggleWrap)
 		case "show-header":
 			appendAction(actShowHeader)
 		case "hide-header":
@@ -1419,6 +1432,8 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actOffsetUp)
 		case "offset-down":
 			appendAction(actOffsetDown)
+		case "offset-middle":
+			appendAction(actOffsetMiddle)
 		case "preview-top":
 			appendAction(actPreviewTop)
 		case "preview-bottom":
@@ -1858,7 +1873,10 @@ func parseMargin(opt string, margin string) ([4]sizeSpec, error) {
 	return [4]sizeSpec{}, errors.New("invalid " + opt + ": " + margin)
 }
 
-func parseMarkerMultiLine(str string) ([3]string, error) {
+func parseMarkerMultiLine(str string) (*[3]string, error) {
+	if str == "" {
+		return &[3]string{}, nil
+	}
 	gr := uniseg.NewGraphemes(str)
 	parts := []string{}
 	totalWidth := 0
@@ -1870,7 +1888,7 @@ func parseMarkerMultiLine(str string) ([3]string, error) {
 
 	result := [3]string{}
 	if totalWidth != 3 && totalWidth != 6 {
-		return result, fmt.Errorf("invalid total marker width: %d (expected: 3 or 6)", totalWidth)
+		return &result, fmt.Errorf("invalid total marker width: %d (expected: 0, 3 or 6)", totalWidth)
 	}
 
 	expected := totalWidth / 3
@@ -1886,7 +1904,15 @@ func parseMarkerMultiLine(str string) ([3]string, error) {
 			break
 		}
 	}
-	return result, nil
+	return &result, nil
+}
+
+func parsePathSep(str string) (byte, error) {
+	bytes := []byte(str)
+	if len(bytes) != 1 {
+		return os.PathSeparator, errors.New("invalid path separator (expected: single-byte character)")
+	}
+	return bytes[0], nil
 }
 
 func parseOptions(index *int, opts *Options, allArgs []string) error {
@@ -2155,6 +2181,16 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			opts.CursorLine = false
 		case "--no-cycle":
 			opts.Cycle = false
+		case "--wrap":
+			opts.Wrap = true
+		case "--no-wrap":
+			opts.Wrap = false
+		case "--wrap-sign":
+			str, err := nextString(allArgs, &i, "wrap sign required")
+			if err != nil {
+				return err
+			}
+			opts.WrapSign = &str
 		case "--multi-line":
 			opts.MultiLine = true
 		case "--no-multi-line":
@@ -2187,6 +2223,12 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			if opts.InfoStyle, opts.InfoPrefix, err = parseInfoStyle(str); err != nil {
 				return err
 			}
+		case "--info-command":
+			if opts.InfoCommand, err = nextString(allArgs, &i, "info command required"); err != nil {
+				return err
+			}
+		case "--no-info-command":
+			opts.InfoCommand = ""
 		case "--no-info":
 			opts.InfoStyle = infoHidden
 		case "--inline-info":
@@ -2448,6 +2490,14 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				return err
 			}
 			opts.WalkerSkip = filterNonEmpty(strings.Split(str, ","))
+		case "--walker-path-sep":
+			str, err := nextString(allArgs, &i, "path separator required")
+			if err != nil {
+				return err
+			}
+			if opts.WalkerSep, err = parsePathSep(str); err != nil {
+				return err
+			}
 		case "--profile-cpu":
 			if opts.CPUProfile, err = nextString(allArgs, &i, "file path required: cpu"); err != nil {
 				return err
@@ -2499,6 +2549,8 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				if err := parseLabelPosition(&opts.PreviewLabel, value); err != nil {
 					return err
 				}
+			} else if match, value := optString(arg, "--wrap-sign="); match {
+				opts.WrapSign = &value
 			} else if match, value := optString(arg, "--prompt="); match {
 				opts.Prompt = value
 			} else if match, value := optString(arg, "--pointer="); match {
@@ -2541,6 +2593,8 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				if opts.InfoStyle, opts.InfoPrefix, err = parseInfoStyle(value); err != nil {
 					return err
 				}
+			} else if match, value := optString(arg, "--info-command="); match {
+				opts.InfoCommand = value
 			} else if match, value := optString(arg, "--separator="); match {
 				opts.Separator = &value
 			} else if match, value := optString(arg, "--scrollbar="); match {
@@ -2631,6 +2685,10 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				opts.WalkerRoot = value
 			} else if match, value := optString(arg, "--walker-skip="); match {
 				opts.WalkerSkip = filterNonEmpty(strings.Split(value, ","))
+			} else if match, value := optString(arg, "--walker-path-sep="); match {
+				if opts.WalkerSep, err = parsePathSep(value); err != nil {
+					return err
+				}
 			} else if match, value := optString(arg, "--hscroll-off="); match {
 				if opts.HscrollOff, err = atoi(value); err != nil {
 					return err
@@ -2687,9 +2745,6 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 }
 
 func validateSign(sign string, signOptName string) error {
-	if sign == "" {
-		return fmt.Errorf("%v cannot be empty", signOptName)
-	}
 	if uniseg.StringWidth(sign) > 2 {
 		return fmt.Errorf("%v display width should be up to 2", signOptName)
 	}
@@ -2758,32 +2813,42 @@ func postProcessOptions(opts *Options) error {
 
 	markerLen := 1
 	if opts.Marker == nil {
-		// "▎" looks better, but not all terminals render it correctly
-		defaultMarker := "┃"
-		if !opts.Unicode {
-			defaultMarker = ">"
+		if opts.MarkerMulti != nil && opts.MarkerMulti[0] == "" {
+			empty := ""
+			opts.Marker = &empty
+			markerLen = 0
+		} else {
+			// "▎" looks better, but not all terminals render it correctly
+			defaultMarker := "┃"
+			if !opts.Unicode {
+				defaultMarker = ">"
+			}
+			opts.Marker = &defaultMarker
 		}
-		opts.Marker = &defaultMarker
 	} else {
 		markerLen = uniseg.StringWidth(*opts.Marker)
 	}
 
 	markerMultiLen := 1
-	if len(opts.MarkerMulti[0]) == 0 {
-		if opts.Unicode {
-			opts.MarkerMulti = [3]string{"╻", "┃", "╹"}
+	if opts.MarkerMulti == nil {
+		if *opts.Marker == "" {
+			opts.MarkerMulti = &[3]string{}
+			markerMultiLen = 0
+		} else if opts.Unicode {
+			opts.MarkerMulti = &[3]string{"╻", "┃", "╹"}
 		} else {
-			opts.MarkerMulti = [3]string{".", "|", "'"}
+			opts.MarkerMulti = &[3]string{".", "|", "'"}
 		}
 	} else {
 		markerMultiLen = uniseg.StringWidth(opts.MarkerMulti[0])
 	}
-	if markerMultiLen > markerLen {
-		padded := *opts.Marker + " "
+	diff := markerMultiLen - markerLen
+	if diff > 0 {
+		padded := *opts.Marker + strings.Repeat(" ", diff)
 		opts.Marker = &padded
-	} else if markerMultiLen < markerLen {
+	} else if diff < 0 {
 		for idx := range opts.MarkerMulti {
-			opts.MarkerMulti[idx] += " "
+			opts.MarkerMulti[idx] += strings.Repeat(" ", -diff)
 		}
 	}
 
@@ -2920,4 +2985,19 @@ func ParseOptions(useDefaults bool, args []string) (*Options, error) {
 	}
 
 	return opts, nil
+}
+
+func (opts *Options) reloadOnStart() bool {
+	// Not compatible with --filter
+	if opts.Filter != nil {
+		return false
+	}
+	if actions, prs := opts.Keymap[tui.Start.AsEvent()]; prs {
+		for _, action := range actions {
+			if action.t == actReload || action.t == actReloadSync {
+				return true
+			}
+		}
+	}
+	return false
 }
