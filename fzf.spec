@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.54.0
+Version:	0.54.1
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -46,19 +46,20 @@ install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
 %{_datadir}/fzf/shell/key-bindings.bash
 
 %changelog
-* Mon Jul 8 2024 Danie de Jager - 0.54.0-1
-* Fri Jun 7 2024 Danie de Jager - 0.53.0-1
-* Tue May 7 2024 Danie de Jager - 0.52.0-1
-* Mon May 2 2024 Danie de Jager - 0.51.0-1
-* Mon Apr 15 2024 Danie de Jager - 0.50.0-1
-* Thu Apr 4 2024 Danie de Jager - 0.49.0-1
-* Thu Mar 14 2024 Danie de Jager - 0.48.0-1
-* Sun Mar 10 2024 Danie de Jager - 0.47.0-1
-* Mon Feb 5 2024 Danie de Jager - 0.46.1-1
+* Fri Jul 19 2024 - Danie de Jager - 0.54.1-1
+* Mon Jul 8 2024 - Danie de Jager - 0.54.0-1
+* Fri Jun 7 2024 - Danie de Jager - 0.53.0-1
+* Tue May 7 2024 - Danie de Jager - 0.52.0-1
+* Mon May 2 2024 - Danie de Jager - 0.51.0-1
+* Mon Apr 15 2024 - Danie de Jager - 0.50.0-1
+* Thu Apr 4 2024 - Danie de Jager - 0.49.0-1
+* Thu Mar 14 2024 - Danie de Jager - 0.48.0-1
+* Sun Mar 10 2024 - Danie de Jager - 0.47.0-1
+* Mon Feb 5 2024 - Danie de Jager - 0.46.1-1
 - Bug fixes and improvements
 - Updated rivo/uniseg dependency to v0.4.6
-* Thu Jan 25 2024 Danie de Jager - 0.46.0-1
-* Wed Nov 22 2023 Danie de Jager - 0.44.1-2
+* Thu Jan 25 2024 - Danie de Jager - 0.46.0-1
+* Wed Nov 22 2023 - Danie de Jager - 0.44.1-2
 - fix: version info was previously not correct
-* Wed Nov 22 2023 Danie de Jager - 0.44.1-1
+* Wed Nov 22 2023 - Danie de Jager - 0.44.1-1
 - fix: Fixed crash when preview window is hidden on focus event
