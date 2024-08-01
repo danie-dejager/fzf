@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.54.2
+Version:	0.54.3
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -46,6 +46,9 @@ install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
 %{_datadir}/fzf/shell/key-bindings.bash
 
 %changelog
+* Thu Aug 1 2024 - Danie de Jager - 0.54.3-1
+- Fixed incompatibility of adaptive height specification and 'start:reload'
+- Environment variables are now available to $FZF_DEFAULT_COMMAND
 * Fri Jul 26 2024 - Danie de Jager - 0.54.2-1
 * Fri Jul 19 2024 - Danie de Jager - 0.54.1-1
 * Mon Jul 8 2024 - Danie de Jager - 0.54.0-1
