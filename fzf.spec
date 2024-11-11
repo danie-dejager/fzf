@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.56.1
+Version:	0.56.2
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -46,6 +46,7 @@ install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
 %{_datadir}/fzf/shell/key-bindings.bash
 
 %changelog
+* Mon Nov 11 2024 - Danie de Jager - 0.56.2-1
 * Mon Nov 11 2024 - Danie de Jager - 0.56.1-1
 * Sun Oct 27 2024 - Danie de Jager - 0.56.0-1
 * Fri Aug 30 2024 - Danie de Jager - 0.55.0-1
