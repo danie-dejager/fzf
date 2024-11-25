@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.56.2
+Version:	0.56.3
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -46,6 +46,10 @@ install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
 %{_datadir}/fzf/shell/key-bindings.bash
 
 %changelog
+* Mon Nov 25 2024 - Danie de Jager - 0.56.3-1
+- Bug fixes in zsh scripts
+-- fix(zsh): handle backtick trigger edge case (#4090)
+-- revert(zsh): remove 'fc -RI' call in the history widget (#4093)
 * Mon Nov 11 2024 - Danie de Jager - 0.56.2-1
 * Mon Nov 11 2024 - Danie de Jager - 0.56.1-1
 * Sun Oct 27 2024 - Danie de Jager - 0.56.0-1
