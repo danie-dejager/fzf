@@ -1,6 +1,6 @@
 Name:		fzf
 Version:	0.56.3
-Release:	1%{?dist}
+Release:	2%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
 URL:		https://github.com/junegunn/fzf
@@ -9,12 +9,31 @@ Source0:	https://github.com/junegunn/fzf/archive/refs/tags/v%{version}.tar.gz
 BuildRequires:	golang
 BuildRequires:	git
 BuildRequires:	systemd-rpm-macros
+Requires:	bash
 
 %global _hardened_build 1
 %global debug_package %{nil}
 
 %description
 fzf is a general-purpose command-line fuzzy finder.
+
+%package fish-completion
+Summary: Fish completion files for %{name}
+Requires: fish
+Requires: %{name} = %{version}-%{release}
+BuildArch: noarch
+
+%description fish-completion
+%{summary}
+
+%package zsh-completion
+Summary: ZSH completion files for %{name}
+Requires: zsh
+Requires: %{name} = %{version}-%{release}
+BuildArch: noarch
+
+%description zsh-completion
+%{summary}
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -23,29 +42,44 @@ fzf is a general-purpose command-line fuzzy finder.
 GO111MODULE=on CGO_ENABLED=0 go build -v -trimpath -buildmode=pie -modcacherw -tags netgo -ldflags="-s -w -X main.version=%{version} -X main.revision=tarball" -o %{name}
 gzip man/man1/fzf.1
 gzip man/man1/fzf-tmux.1
-rm -rf shell/key-bindings.fish shell/key-bindings.zsh 
-sed -i -e '/^#!\//, 1d' shell/completion.*
-sed -i -e '1d;2i#!/bin/bash' bin/fzf-tmux
 
 %install
-install -Dpm 0755 %{name} %{buildroot}%{_bindir}/%{name}
-install -Dpm 0755 bin/%{name}-tmux %{buildroot}%{_bindir}/%{name}-tmux
-install -Dpm 0644 man/man1/fzf.1.gz %{buildroot}%{_mandir}/man1/fzf.1.gz
-install -Dpm 0644 man/man1/fzf-tmux.1.gz %{buildroot}%{_mandir}/man1/fzf-tmux.1.gz
-install -Dpm 0644 shell/completion.bash %{buildroot}/etc/bash_completion.d/%{name}_completion.bash
-	
-install -d %{buildroot}%{_datadir}/fzf/shell
-install -Dpm0644 shell/key-bindings.* %{buildroot}%{_datadir}/fzf/shell/
+mkdir -p %{buildroot}%{_bindir}
+mkdir -p %{buildroot}%{_mandir}/man1
+mkdir -p %{buildroot}%{_sysconfdir}/bash_completion.d
+mkdir -p %{buildroot}%{_datadir}/fish/completions
+mkdir -p %{buildroot}%{_datadir}/zsh/site-functions
+
+install -pm 0755 %{name} %{buildroot}%{_bindir}/%{name}
+install -pm 0755 bin/%{name}-tmux %{buildroot}%{_bindir}/%{name}-tmux
+install -pm 0644 man/man1/fzf.1.gz %{buildroot}%{_mandir}/man1/fzf.1.gz
+install -pm 0644 man/man1/fzf-tmux.1.gz %{buildroot}%{_mandir}/man1/fzf-tmux.1.gz
+
+# Create shell completion configuration files
+echo 'eval "$(fzf --bash)"' > %{buildroot}%{_sysconfdir}/bash_completion.d/fzf-completion.sh
+echo 'source <(fzf --zsh)' > %{buildroot}%{_datadir}/zsh/site-functions/_fzf
+echo 'fzf --fish | source' > %{buildroot}%{_datadir}/fish/completions/fzf.fish
 
 %files
 %{_bindir}/fzf
 %{_bindir}/fzf-tmux
 %{_mandir}/man1/fzf.1.gz
 %{_mandir}/man1/fzf-tmux.1.gz
-%{_sysconfdir}/bash_completion.d/%{name}_completion.bash
-%{_datadir}/fzf/shell/key-bindings.bash
+%{_sysconfdir}/bash_completion.d/fzf-completion.sh
+
+%files zsh-completion
+%{_datadir}/zsh/site-functions/_fzf
+
+%files fish-completion
+%{_datadir}/fish/completions/fzf.fish
 
 %changelog
+* Mon Nov 25 2024 - Danie de Jager - 0.56.3-2
+- Improve shell completions for fish and zsh.
+* Mon Nov 25 2024 - Danie de Jager - 0.56.3-1
+- Bug fixes in zsh scripts
+-- fix(zsh): handle backtick trigger edge case (#4090)
+-- revert(zsh): remove 'fc -RI' call in the history widget (#4093)
 * Mon Nov 25 2024 - Danie de Jager - 0.56.3-1
 - Bug fixes in zsh scripts
 -- fix(zsh): handle backtick trigger edge case (#4090)
