@@ -97,6 +97,7 @@ const (
 	AttrUndefined = Attr(0)
 	AttrRegular   = Attr(1 << 7)
 	AttrClear     = Attr(1 << 8)
+	BoldForce     = Attr(1 << 10)
 )
 
 func (r *FullscreenRenderer) PassThrough(str string) {
@@ -141,6 +142,11 @@ func (c Color) Style() tcell.Color {
 }
 
 func (a Attr) Merge(b Attr) Attr {
+	if b&AttrRegular > 0 {
+		// Only keep bold attribute set by the system
+		return b | (a & BoldForce)
+	}
+
 	return a | b
 }
 
@@ -556,11 +562,13 @@ func (r *FullscreenRenderer) NewWindow(top int, left int, width int, height int,
 	normal := ColBorder
 	switch windowType {
 	case WindowList:
-		normal = ColListBorder
+		normal = ColNormal
+	case WindowHeader:
+		normal = ColHeader
 	case WindowInput:
-		normal = ColInputBorder
+		normal = ColInput
 	case WindowPreview:
-		normal = ColPreviewBorder
+		normal = ColPreview
 	}
 	w := &TcellWindow{
 		color:       r.theme.Colored,
@@ -593,9 +601,16 @@ func (w *TcellWindow) EraseMaybe() bool {
 	return true
 }
 
+func (w *TcellWindow) EncloseX(x int) bool {
+	return x >= w.left && x < (w.left+w.width)
+}
+
+func (w *TcellWindow) EncloseY(y int) bool {
+	return y >= w.top && y < (w.top+w.height)
+}
+
 func (w *TcellWindow) Enclose(y int, x int) bool {
-	return x >= w.left && x < (w.left+w.width) &&
-		y >= w.top && y < (w.top+w.height)
+	return w.EncloseX(x) && w.EncloseY(y)
 }
 
 func (w *TcellWindow) Move(y int, x int) {
@@ -685,7 +700,7 @@ func (w *TcellWindow) fillString(text string, pair ColorPair) FillReturn {
 	}
 	style = style.
 		Blink(a&Attr(tcell.AttrBlink) != 0).
-		Bold(a&Attr(tcell.AttrBold) != 0).
+		Bold(a&Attr(tcell.AttrBold) != 0 || a&BoldForce != 0).
 		Dim(a&Attr(tcell.AttrDim) != 0).
 		Reverse(a&Attr(tcell.AttrReverse) != 0).
 		Underline(a&Attr(tcell.AttrUnderline) != 0).
@@ -792,6 +807,8 @@ func (w *TcellWindow) drawBorder(onlyHorizontal bool) {
 			style = ColBorder.style()
 		case WindowList:
 			style = ColListBorder.style()
+		case WindowHeader:
+			style = ColHeaderBorder.style()
 		case WindowInput:
 			style = ColInputBorder.style()
 		case WindowPreview:
