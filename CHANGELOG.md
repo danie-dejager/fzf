@@ -1,6 +1,60 @@
 CHANGELOG
 =========
 
+0.59.0
+------
+- Prioritizing file name matches (#4192)
+    - Added a new tiebreak option `pathname` for prioritizing file name matches
+    - `--scheme=path` now sets `--tiebreak=pathname,length`
+    - fzf will automatically choose `path` scheme when the input is a TTY device, where fzf would start its built-in walker or run `$FZF_DEFAULT_COMMAND` which is usually a command for listing files.
+- Added `--header-lines-border` to display header from `--header-lines` with a separate border
+  ```sh
+  # Use --header-lines-border to separate two headers
+  ps -ef | fzf --style full --layout reverse --header-lines 1 \
+               --bind 'ctrl-r:reload(ps -ef)' --header 'Press CTRL-R to reload' \
+               --header-lines-border bottom --no-list-border
+  ```
+- `click-header` event will also set `$FZF_CLICK_HEADER_WORD` and `$FZF_CLICK_HEADER_NTH`. You can use it to implement a clickable header that changes the search scope using the new `transform-nth` action.
+  ```sh
+  # Click on the header line to limit search scope
+  ps -ef | fzf --style full --layout reverse --header-lines 1 \
+               --header-lines-border bottom --no-list-border \
+               --color fg:dim,nth:regular \
+               --bind 'click-header:transform-nth(
+                         echo $FZF_CLICK_HEADER_NTH
+                       )+transform-prompt(
+                         echo "$FZF_CLICK_HEADER_WORD> "
+                       )'
+  ```
+- Added `search(...)` and `transform-search(...)` action to trigger an fzf search with an arbitrary query string. This can be used to extend the search syntax of fzf. In the following example, fzf will use the first word of the query to trigger ripgrep search, and use the rest of the query to perform fzf search within the result.
+  ```sh
+  TRANSFORMER='
+    words=($FZF_QUERY)
+
+    # If $FZF_QUERY contains multiple words, drop the first word,
+    # and trigger fzf search with the rest
+    if [[ ${#words[@]} -gt 1 ]]; then
+      echo "search:${FZF_QUERY#* }"
+
+    # Otherwise, if the query does not end with a space,
+    # restart ripgrep and reload the list
+    elif ! [[ $FZF_QUERY =~ \ $ ]]; then
+      echo "reload:rg --column --color=always --smart-case \"${words[0]}\""
+    fi
+  '
+  fzf --ansi --disabled \
+    --with-shell 'bash -c' \
+    --bind "start:transform:$TRANSFORMER" \
+    --bind "change:transform:$TRANSFORMER"
+  ```
+- Added `bell` action to ring the terminal bell
+  ```sh
+  # Press CTRL-Y to copy the current line to the clipboard and ring the bell
+  fzf --bind 'ctrl-y:execute-silent(echo -n {} | pbcopy)+bell'
+  ```
+- Bug fixes and improvements
+- Fixed fish script to support fish 3.1.2 or later (@bitraid)
+
 0.58.0
 ------
 _Release highlights: https://junegunn.github.io/fzf/releases/0.58.0/_
