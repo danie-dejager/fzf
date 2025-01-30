@@ -336,9 +336,12 @@ Adaptive height has the following limitations:
 * It will not find the right size when there are multi-line items
 
 .TP
-.BI "\-\-min\-height=" "HEIGHT"
-Minimum height when \fB\-\-height\fR is given in percent (default: 10).
-Ignored when \fB\-\-height\fR is not specified.
+.BI "\-\-min\-height=" "HEIGHT[+]"
+Minimum height when \fB\-\-height\fR is given as a percentage.
+Add \fB+\fR to automatically increase the value according to the other
+layout options so that the specified number of items are visible in the list
+section (default: \fB10+\fR).
+Ignored when \fB\-\-height\fR is not specified or set as an absolute value.
 .TP
 .BI "\-\-tmux" "[=[center|top|bottom|left|right][,SIZE[%]][,SIZE[%]][,border-native]]"
 Start fzf in a tmux popup (default \fBcenter,50%\fR). Requires tmux 3.3 or
@@ -618,6 +621,11 @@ Position of the list label
 .SS INPUT SECTION
 
 .TP
+.B "\-\-no\-input"
+Disable and hide the input section. You can no longer type in queries. To
+trigger a search, use \fBsearch\fR action.
+
+.TP
 .BI "\-\-prompt=" "STR"
 Input prompt (default: '> ')
 .TP
@@ -739,6 +747,8 @@ e.g.
 Also,
 
 * \fB{q}\fR is replaced to the current query string
+.br
+* \fB{q}\fR can contain field index expressions. e.g. \fB{q:1}\fR, \fB{q:2..}\fR, etc.
 .br
 * \fB{n}\fR is replaced to the zero-based ordinal index of the current item.
   Use \fB{+n}\fR if you want all index numbers when multiple lines are selected.
@@ -1291,10 +1301,15 @@ more \fBactions\fR. You can use it to customize key bindings or implement
 dynamic behaviors.
 
 \fB\-\-bind\fR takes a comma-separated list of binding expressions. Each binding
-expression is \fBKEY:ACTION\fR or \fBEVENT:ACTION\fR.
+expression is \fBKEY:ACTION\fR or \fBEVENT:ACTION\fR. You can bind actions to
+multiple keys and events by writing comma-separated list of keys and events
+before the colon. e.g. \fBKEY1,KEY2,EVENT1,EVENT2:ACTION\fR.
 
 e.g.
-     \fBfzf \-\-bind=ctrl\-j:accept,ctrl\-k:kill\-line\fR
+     \fBfzf \-\-bind=ctrl\-j:accept,ctrl\-k:kill\-line
+
+     # Load 'ps \-ef' output on start and reload it on CTRL\-R
+     fzf \-\-bind 'start,ctrl\-r:reload:ps \-ef'\fR
 
 .SS AVAILABLE KEYS:    (SYNONYMS)
 \fIctrl\-[a\-z]\fR
