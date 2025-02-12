@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.59.0
+Version:	0.60.0
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -74,8 +74,9 @@ echo 'fzf --fish | source' > %{buildroot}%{_datadir}/fish/completions/fzf.fish
 %{_datadir}/fish/completions/fzf.fish
 
 %changelog
-* Mon Feb 3 2024 - Danie de Jager - 0.59.0-1
-* Mon Jan 20 2024 - Danie de Jager - 0.58.0-1
+* Wed Feb 12 2025 - Danie de Jager - 0.60.0-1
+* Mon Feb 3 2025 - Danie de Jager - 0.59.0-1
+* Mon Jan 20 2025 - Danie de Jager - 0.58.0-1
 * Tue Dec 17 2024 - Danie de Jager - 0.57.0-1
 * Mon Nov 25 2024 - Danie de Jager - 0.56.3-2
 - Improve shell completions for fish and zsh.
