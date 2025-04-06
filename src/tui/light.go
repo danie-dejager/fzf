@@ -213,7 +213,7 @@ func (r *LightRenderer) Init() error {
 		}
 	}
 
-	r.enableMouse()
+	r.enableModes()
 	r.csi(fmt.Sprintf("%dA", r.MaxY()-1))
 	r.csi("G")
 	r.csi("K")
@@ -462,10 +462,11 @@ func (r *LightRenderer) escSequence(sz *int) Event {
 				}
 				// Bracketed paste mode: \e[200~ ... \e[201~
 				if len(r.buffer) > 5 && r.buffer[3] == '0' && (r.buffer[4] == '0' || r.buffer[4] == '1') && r.buffer[5] == '~' {
-					// Immediately discard the sequence from the buffer and reread input
-					r.buffer = r.buffer[6:]
-					*sz = 0
-					return r.GetChar()
+					*sz = 6
+					if r.buffer[4] == '0' {
+						return Event{BracketedPasteBegin, 0, nil}
+					}
+					return Event{BracketedPasteEnd, 0, nil}
 				}
 				return Event{Invalid, 0, nil} // INS
 			case '3':
@@ -681,7 +682,7 @@ func (r *LightRenderer) rmcup() {
 }
 
 func (r *LightRenderer) Pause(clear bool) {
-	r.disableMouse()
+	r.disableModes()
 	r.restoreTerminal()
 	if clear {
 		if r.fullscreen {
@@ -694,12 +695,13 @@ func (r *LightRenderer) Pause(clear bool) {
 	}
 }
 
-func (r *LightRenderer) enableMouse() {
+func (r *LightRenderer) enableModes() {
 	if r.mouse {
 		r.csi("?1000h")
 		r.csi("?1002h")
 		r.csi("?1006h")
 	}
+	r.csi("?2004h") // Enable bracketed paste mode
 }
 
 func (r *LightRenderer) disableMouse() {
@@ -710,6 +712,11 @@ func (r *LightRenderer) disableMouse() {
 	}
 }
 
+func (r *LightRenderer) disableModes() {
+	r.disableMouse()
+	r.csi("?2004l")
+}
+
 func (r *LightRenderer) Resume(clear bool, sigcont bool) {
 	r.setupTerminal()
 	if clear {
@@ -718,7 +725,7 @@ func (r *LightRenderer) Resume(clear bool, sigcont bool) {
 		} else {
 			r.rmcup()
 		}
-		r.enableMouse()
+		r.enableModes()
 		r.flush()
 	} else if sigcont && !r.fullscreen && r.mouse {
 		// NOTE: SIGCONT (Coming back from CTRL-Z):
@@ -773,7 +780,7 @@ func (r *LightRenderer) Close() {
 	if !r.showCursor {
 		r.csi("?25h")
 	}
-	r.disableMouse()
+	r.disableModes()
 	r.flush()
 	r.restoreTerminal()
 	r.closePlatform()
