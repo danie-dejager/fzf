@@ -39,6 +39,13 @@ BuildArch: noarch
 %autosetup -n %{name}-%{version}
 
 %build
+%ifarch x86_64
+export GOARCH=amd64
+%endif
+
+%ifarch aarch64
+export GOARCH=arm64
+%endif
 GO111MODULE=on CGO_ENABLED=0 go build -v -trimpath -buildmode=pie -modcacherw -tags netgo -ldflags="-s -w -X main.version=%{version} -X main.revision=tarball" -o %{name}
 gzip man/man1/fzf.1
 gzip man/man1/fzf-tmux.1
