@@ -1,6 +1,6 @@
 Name:		fzf
 Version:	0.61.3
-Release:	1%{?dist}
+Release:	2%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
 URL:		https://github.com/junegunn/fzf
@@ -16,15 +16,6 @@ Requires:	bash
 
 %description
 fzf is a general-purpose command-line fuzzy finder.
-
-%package fish-completion
-Summary: Fish completion files for %{name}
-Requires: fish
-Requires: %{name} = %{version}-%{release}
-BuildArch: noarch
-
-%description fish-completion
-%{summary}
 
 %package zsh-completion
 Summary: ZSH completion files for %{name}
@@ -77,11 +68,8 @@ echo 'fzf --fish | source' > %{buildroot}%{_datadir}/fish/completions/fzf.fish
 %files zsh-completion
 %{_datadir}/zsh/site-functions/_fzf
 
-%files fish-completion
-%{_datadir}/fish/completions/fzf.fish
-
 %changelog
-* Sun Apr 27 2025 - Danie de Jager - 0.61.3-1
+* Sun Apr 27 2025 - Danie de Jager - 0.61.3-2
 * Sun Apr 20 2025 - Danie de Jager - 0.61.2-1
 * Sun Apr 6 2025 - Danie de Jager - 0.61.1-1
 * Sat Mar 8 2025 - Danie de Jager - 0.60.3-1
