@@ -45,7 +45,6 @@ gzip man/man1/fzf-tmux.1
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_mandir}/man1
 mkdir -p %{buildroot}%{_sysconfdir}/bash_completion.d
-mkdir -p %{buildroot}%{_datadir}/fish/completions
 mkdir -p %{buildroot}%{_datadir}/zsh/site-functions
 
 install -pm 0755 %{name} %{buildroot}%{_bindir}/%{name}
@@ -56,7 +55,6 @@ install -pm 0644 man/man1/fzf-tmux.1.gz %{buildroot}%{_mandir}/man1/fzf-tmux.1.g
 # Create shell completion configuration files
 echo 'eval "$(fzf --bash)"' > %{buildroot}%{_sysconfdir}/bash_completion.d/fzf-completion.sh
 echo 'source <(fzf --zsh)' > %{buildroot}%{_datadir}/zsh/site-functions/_fzf
-echo 'fzf --fish | source' > %{buildroot}%{_datadir}/fish/completions/fzf.fish
 
 %files
 %{_bindir}/fzf
