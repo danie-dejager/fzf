@@ -1,5 +1,5 @@
 Name:		fzf
-Version:	0.68.0
+Version:	0.70.0
 Release:	1%{?dist}
 Summary:	A command-line fuzzy finder
 License:	MIT license
@@ -67,6 +67,7 @@ echo 'source <(fzf --zsh)' > %{buildroot}%{_datadir}/zsh/site-functions/_fzf
 %{_datadir}/zsh/site-functions/_fzf
 
 %changelog
+* Mon Mar 2 2026 - Danie de Jager - 0.70.0-1
 * Sat Feb 21 2026 - Danie de Jager - 0.68.0-1
 * Sun Nov 16 2025 - Danie de Jager - 0.67.0-1
 * Sun Oct 26 2025 - Danie de Jager - 0.66.1-1
