@@ -56,6 +56,9 @@ func Run(opts *Options) (int, error) {
 		if opts.useTmux() {
 			return runTmux(os.Args, opts)
 		}
+		if opts.useZellij() {
+			return runZellij(os.Args, opts)
+		}
 
 		if needWinpty(opts) {
 			return runWinpty(os.Args, opts)
@@ -469,7 +472,9 @@ func Run(opts *Options) (int, error) {
 					if heightUnknown && !deferred {
 						determine(!reading)
 					}
-					matcher.Reset(snapshot, input(), false, !reading, sort, snapshotRevision)
+					if !useSnapshot || evt == EvtReadFin {
+						matcher.Reset(snapshot, input(), false, !reading, sort, snapshotRevision)
+					}
 
 				case EvtSearchNew:
 					var command *commandSpec

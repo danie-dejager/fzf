@@ -66,7 +66,7 @@ Usage: fzf [options]
     --no-bold                Do not use bold text
 
   DISPLAY MODE
-    --height=[~]HEIGHT[%]    Display fzf window below the cursor with the given
+    --height=[~][-]HEIGHT[%] Display fzf window below the cursor with the given
                              height instead of using fullscreen.
                              A negative value is calculated as the terminal height
                              minus the given value.
@@ -75,9 +75,10 @@ Usage: fzf [options]
     --min-height=HEIGHT[+]   Minimum height when --height is given as a percentage.
                              Add '+' to automatically increase the value
                              according to the other layout options (default: 10+).
-    --tmux[=OPTS]            Start fzf in a tmux popup (requires tmux 3.3+)
+    --popup[=OPTS]           Start fzf in a popup window (requires tmux 3.3+ or Zellij 0.44+)
                              [center|top|bottom|left|right][,SIZE[%]][,SIZE[%]]
                              [,border-native] (default: center,50%)
+    --tmux[=OPTS]            Alias for --popup
 
   LAYOUT
     --layout=LAYOUT          Choose layout: [default|reverse|reverse-list]
@@ -101,6 +102,7 @@ Usage: fzf [options]
     --no-multi-line          Disable multi-line display of items when using --read0
     --raw                    Enable raw mode (show non-matching items)
     --track                  Track the current selection when the result is updated
+    --id-nth=N[,..]          Define item identity fields for cross-reload operations
     --tac                    Reverse the order of the input
     --gap[=N]                Render empty lines between each item
     --gap-line[=STR]         Draw horizontal line on each gap using the string
@@ -416,7 +418,7 @@ func parseTmuxOptions(arg string, index int) (*tmuxOptions, error) {
 	var err error
 	opts := defaultTmuxOptions(index)
 	tokens := splitRegexp.Split(arg, -1)
-	errorToReturn := errors.New("invalid tmux option: " + arg + " (expected: [center|top|bottom|left|right][,SIZE[%]][,SIZE[%][,border-native]])")
+	errorToReturn := errors.New("invalid popup option: " + arg + " (expected: [center|top|bottom|left|right][,SIZE[%]][,SIZE[%][,border-native]])")
 	if len(tokens) == 0 || len(tokens) > 4 {
 		return nil, errorToReturn
 	}
@@ -594,6 +596,7 @@ type Options struct {
 	Sort              int
 	Raw               bool
 	Track             trackOption
+	IdNth             []Range
 	Tac               bool
 	Tail              int
 	Criteria          []criterion
@@ -867,7 +870,7 @@ func nthTransformer(str string) (func(Delimiter) func([]Token, int32) string, er
 		nth   []Range
 	}
 
-	parts := make([]NthParts, len(indexes))
+	parts := make([]NthParts, 0, len(indexes))
 	idx := 0
 	for _, index := range indexes {
 		if idx < index[0] {
@@ -1610,7 +1613,7 @@ func parseWalkerOpts(str string) (walkerOpts, error) {
 }
 
 var (
-	executeRegexp    *regexp.Regexp
+	argActionRegexp  *regexp.Regexp
 	splitRegexp      *regexp.Regexp
 	actionNameRegexp *regexp.Regexp
 )
@@ -1629,7 +1632,7 @@ const (
 )
 
 func init() {
-	executeRegexp = regexp.MustCompile(
+	argActionRegexp = regexp.MustCompile(
 		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|bg-transform|transform)-(?:query|prompt|(?:border|list|preview|input|header|footer)-label|header-lines|header|footer|search|with-nth|nth|pointer|ghost)|bg-transform|transform|change-(?:preview-window|preview|multi)|(?:re|un|toggle-)bind|pos|put|print|search|trigger)`)
 	splitRegexp = regexp.MustCompile("[,:]+")
 	actionNameRegexp = regexp.MustCompile("(?i)^[a-z-]+")
@@ -1639,7 +1642,7 @@ func maskActionContents(action string) string {
 	masked := ""
 Loop:
 	for len(action) > 0 {
-		loc := executeRegexp.FindStringIndex(action)
+		loc := argActionRegexp.FindStringIndex(action)
 		if loc == nil {
 			masked += action
 			break
@@ -1694,7 +1697,7 @@ Loop:
 }
 
 func parseSingleActionList(str string) ([]*action, error) {
-	// We prepend a colon to satisfy executeRegexp and remove it later
+	// We prepend a colon to satisfy argActionRegexp and remove it later
 	masked := maskActionContents(":" + str)[1:]
 	return parseActionList(masked, str, []*action{}, false)
 }
@@ -2219,9 +2222,6 @@ func parseHeight(str string, index int) (heightSpec, error) {
 		str = str[1:]
 	}
 	if strings.HasPrefix(str, "-") {
-		if heightSpec.auto {
-			return heightSpec, errors.New("negative(-) height is not compatible with adaptive(~) height")
-		}
 		heightSpec.inverse = true
 		str = str[1:]
 	}
@@ -2634,7 +2634,7 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			opts.Version = true
 		case "--no-winpty":
 			opts.NoWinpty = true
-		case "--tmux":
+		case "--tmux", "--popup":
 			given, str := optionalNextString()
 			if given {
 				if opts.Tmux, err = parseTmuxOptions(str, index); err != nil {
@@ -2643,7 +2643,7 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			} else {
 				opts.Tmux = defaultTmuxOptions(index)
 			}
-		case "--no-tmux":
+		case "--no-tmux", "--no-popup":
 			opts.Tmux = nil
 		case "--tty-default":
 			if opts.TtyDefault, err = nextString("tty device name required"); err != nil {
@@ -2811,6 +2811,16 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			opts.Track = trackEnabled
 		case "--no-track":
 			opts.Track = trackDisabled
+		case "--id-nth":
+			str, err := nextString("nth expression required")
+			if err != nil {
+				return err
+			}
+			if opts.IdNth, err = splitNth(str); err != nil {
+				return err
+			}
+		case "--no-id-nth":
+			opts.IdNth = nil
 		case "--tac":
 			opts.Tac = true
 		case "--no-tac":
@@ -3139,7 +3149,7 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			}
 			opts.PreviewWrapSign = &str
 		case "--height":
-			str, err := nextString("height required: [~]HEIGHT[%]")
+			str, err := nextString("height required: [~][-]HEIGHT[%]")
 			if err != nil {
 				return err
 			}
@@ -3581,7 +3591,7 @@ func validateOptions(opts *Options) error {
 		}
 	}
 
-	if opts.Height.auto {
+	if opts.Height.auto && (opts.Tmux == nil || opts.Tmux.index < opts.Height.index) {
 		for _, s := range []sizeSpec{opts.Margin[0], opts.Margin[2]} {
 			if s.percent {
 				return errors.New("adaptive height is not compatible with top/bottom percent margin")
@@ -3613,6 +3623,10 @@ func noSeparatorLine(style infoStyle, separator bool) bool {
 
 func (opts *Options) useTmux() bool {
 	return opts.Tmux != nil && len(os.Getenv("TMUX")) > 0 && opts.Tmux.index >= opts.Height.index
+}
+
+func (opts *Options) useZellij() bool {
+	return opts.Tmux != nil && len(os.Getenv("ZELLIJ")) > 0 && opts.Tmux.index >= opts.Height.index
 }
 
 func (opts *Options) noSeparatorLine() bool {

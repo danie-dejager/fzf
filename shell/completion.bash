@@ -4,8 +4,6 @@
 #  / __/ / /_/ __/
 # /_/   /___/_/ completion.bash
 #
-# - $FZF_TMUX                 (default: 0)
-# - $FZF_TMUX_OPTS            (default: empty)
 # - $FZF_COMPLETION_TRIGGER   (default: '**')
 # - $FZF_COMPLETION_OPTS      (default: empty)
 # - $FZF_COMPLETION_PATH_OPTS (default: empty)
@@ -161,6 +159,7 @@ _fzf_opts_completion() {
     --history
     --history-size
     --hscroll-off
+    --id-nth
     --info
     --info-command
     --input-border

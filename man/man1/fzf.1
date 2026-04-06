@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ..
-.TH fzf 1 "Mar 2026" "fzf 0.70.0" "fzf - a command-line fuzzy finder"
+.TH fzf 1 "Apr 2026" "fzf 0.71.0" "fzf - a command-line fuzzy finder"
 
 .SH NAME
 fzf - a command-line fuzzy finder
@@ -384,7 +384,7 @@ Use black background
 
 .SS DISPLAY MODE
 .TP
-.BI "\-\-height=" "[~]HEIGHT[%]"
+.BI "\-\-height=" "[~][\-]HEIGHT[%]"
 Display fzf window below the cursor with the given height instead of using
 the full screen.
 
@@ -394,16 +394,18 @@ height minus the given value.
   fzf \-\-height=\-1
 
 When prefixed with \fB~\fR, fzf will automatically determine the height in the
-range according to the input size.
+range according to the input size. You can combine \fB~\fR with a negative
+value.
 
   # Will not take up 100% of the screen
   seq 5 | fzf \-\-height=~100%
 
+  # Adapt to input size, up to terminal height minus 1
+  seq 5 | fzf \-\-height=~\-1
+
 Adaptive height has the following limitations:
 .br
 * Cannot be used with top/bottom margin and padding given in percent size
-.br
-* Negative value is not allowed
 .br
 * It will not find the right size when there are multi-line items
 
@@ -415,25 +417,26 @@ layout options so that the specified number of items are visible in the list
 section (default: \fB10+\fR).
 Ignored when \fB\-\-height\fR is not specified or set as an absolute value.
 .TP
-.BI "\-\-tmux" "[=[center|top|bottom|left|right][,SIZE[%]][,SIZE[%]][,border-native]]"
-Start fzf in a tmux popup (default \fBcenter,50%\fR). Requires tmux 3.3 or
-later. This option is ignored if you are not running fzf inside tmux.
+.BI "\-\-popup" "[=[center|top|bottom|left|right][,SIZE[%]][,SIZE[%]][,border-native]]"
+Start fzf in a tmux popup or in a Zellij floating pane (default
+\fBcenter,50%\fR). Requires tmux 3.3+ or Zellij 0.44+. This option is ignored if you
+are not running fzf inside tmux or Zellij. \fB\-\-tmux\fR is an alias for this option.
 
 e.g.
   \fB# Popup in the center with 70% width and height
-  fzf \-\-tmux 70%
+  fzf \-\-popup 70%
 
   # Popup on the left with 40% width and 100% height
-  fzf \-\-tmux right,40%
+  fzf \-\-popup right,40%
 
   # Popup on the bottom with 100% width and 30% height
-  fzf \-\-tmux bottom,30%
+  fzf \-\-popup bottom,30%
 
   # Popup on the top with 80% width and 40% height
-  fzf \-\-tmux top,80%,40%
+  fzf \-\-popup top,80%,40%
 
-  # Popup with a native tmux border in the center with 80% width and height
-  fzf \-\-tmux center,80%,border\-native\fR
+  # Popup with a native tmux or Zellij border in the center with 80% width and height
+  fzf \-\-popup center,80%,border\-native\fR
 
 .SS LAYOUT
 .TP
@@ -617,17 +620,53 @@ Disable multi-line display of items when using \fB\-\-read0\fR
 .B "\-\-raw"
 Enable raw mode where non-matching items are also displayed in a dimmed color.
 .TP
-.B "\-\-track"
+.BI "\-\-track"
 Make fzf track the current selection when the result list is updated.
 This can be useful when browsing logs using fzf with sorting disabled. It is
 not recommended to use this option with \fB\-\-tac\fR as the resulting behavior
-can be confusing. Also, consider using \fBtrack\fR action instead of this
-option.
+can be confusing.
+
+When \fB\-\-id\-nth\fR is also set, fzf enables field\-based tracking across
+\fBreload\fRs. See \fB\-\-id\-nth\fR for details.
+
+Without \fB\-\-id\-nth\fR, \fB\-\-track\fR uses index\-based tracking that
+does not persist across reloads.
 
 .RS
 e.g.
-     \fBgit log \-\-oneline \-\-graph \-\-color=always | nl |
+     \fB# Index\-based tracking (does not persist across reloads)
+     git log \-\-oneline \-\-graph \-\-color=always | nl |
          fzf \-\-ansi \-\-track \-\-no\-sort \-\-layout=reverse\-list\fR
+
+     \fB# Track by first field (e.g. pod name) across reloads
+     kubectl get pods | fzf \-\-track \-\-id\-nth 1 \-\-header\-lines=1 \\
+         \-\-bind 'ctrl\-r:reload:kubectl get pods'\fR
+.RE
+.TP
+.BI "\-\-id\-nth=" "N[,..]"
+Define item identity fields for cross\-reload operations. When set, fzf
+uses the specified fields to identify items across \fBreload\fR and
+\fBreload\-sync\fR.
+
+With \fB\-\-track\fR, fzf extracts the tracking key from the current item
+using the nth expression and searches for a matching item in the reloaded list.
+While searching, the UI is blocked (query input and cursor movement are
+disabled, and the prompt is dimmed). With \fBreload\fR, the blocked state
+clears as soon as the match is found in the stream. With \fBreload\-sync\fR,
+the blocked state persists until the entire stream is complete. Press
+\fBEscape\fR or \fBCtrl\-C\fR to cancel the blocked state without quitting fzf.
+
+The info line shows \fB+T*\fR (or \fB+t*\fR for one\-off tracking) while
+the search is in progress.
+
+With \fB\-\-multi\fR, selected items are preserved across \fBreload\-sync\fR
+by matching their identity fields in the reloaded list.
+
+.RS
+e.g.
+     \fB# Track and preserve selections by pod name across reloads
+     kubectl get pods | fzf \-\-multi \-\-track \-\-id\-nth 1 \-\-header\-lines=1 \\
+         \-\-bind 'ctrl\-r:reload\-sync:kubectl get pods'\fR
 .RE
 .TP
 .B "\-\-tac"
