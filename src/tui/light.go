@@ -256,9 +256,10 @@ func (r *LightRenderer) move(y int, x int) {
 	} else if r.y > y {
 		r.csi(fmt.Sprintf("%dA", r.y-y))
 	}
-	r.stderr("\r")
-	if x > 0 {
-		r.csi(fmt.Sprintf("%dC", x))
+	if x == 0 {
+		r.stderr("\r")
+	} else {
+		r.csi(fmt.Sprintf("%dG", x+1))
 	}
 	r.y = y
 	r.x = x
